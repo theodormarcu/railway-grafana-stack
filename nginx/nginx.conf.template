@@ -75,7 +75,7 @@ http {
         }
 
         location /prometheus/ {
-            proxy_pass http://${PROMETHEUS_INTERNAL_URL};
+            proxy_pass ${PROMETHEUS_INTERNAL_URL};
             rewrite ^/prometheus/?(.*)$ /$1 break;
 
             # For IPv6 addresses, use the raw address format
