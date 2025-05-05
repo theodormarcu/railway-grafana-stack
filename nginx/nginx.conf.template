@@ -11,28 +11,28 @@ http {
         location /prometheus/ {
             proxy_pass ${PROMETHEUS_INTERNAL_URL};
             rewrite ^/prometheus/?(.*)$ /$1 break;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host "$host";
+            proxy_set_header X-Real-IP "$remote_addr";
+            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
+            proxy_set_header X-Forwarded-Proto "$scheme";
         }
 
         location /loki/ {
             proxy_pass ${LOKI_INTERNAL_URL};
             rewrite ^/loki/?(.*)$ /$1 break;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host "$host";
+            proxy_set_header X-Real-IP "$remote_addr";
+            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
+            proxy_set_header X-Forwarded-Proto "$scheme";
         }
 
         location /tempo/ {
             proxy_pass ${TEMPO_INTERNAL_URL};
             rewrite ^/tempo/?(.*)$ /$1 break;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host "$host";
+            proxy_set_header X-Real-IP "$remote_addr";
+            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
+            proxy_set_header X-Forwarded-Proto "$scheme";
         }
     }
 }
