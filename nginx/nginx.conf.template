@@ -109,9 +109,5 @@ http {
             proxy_set_header X-Forwarded-Proto "$scheme";
         }
 
-        location /alloy/ {
-            proxy_pass http://alloy.railway.internal:12345/;
-            proxy_set_header Host alloy.railway.internal;
-        }
     }
 }
