@@ -1,6 +1,18 @@
-events {}
+worker_processes 1;
+
+events {
+    worker_connections 512;
+    use epoll;
+    multi_accept off;
+}
 
 http {
+    keepalive_timeout 65;
+    keepalive_requests 100;
+    client_body_timeout 10;
+    client_header_timeout 10;
+    send_timeout 10;
+
     server {
         listen 80;
         server_name _;
