@@ -8,7 +8,7 @@ scrape_configs:
       - targets: [ 'localhost:9090' ]
 
   # 2. Scrape Alloy's public endpoint
-  - job_name: alloy_public
+  - job_name: concierge
     scheme: https               # Railway's public domains are TLS
     metrics_path: /metrics      # Alloy exposes metrics at /metrics
     static_configs:
