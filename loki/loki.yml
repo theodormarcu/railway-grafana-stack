@@ -11,7 +11,6 @@ limits_config:
   query_timeout: 3m
   max_query_parallelism: 8
   max_entries_limit_per_query: 5000
-  max_chunk_age: 1h
 
 common:
   ring:
