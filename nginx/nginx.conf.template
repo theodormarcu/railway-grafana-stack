@@ -27,42 +27,18 @@ http {
         listen 80;
         server_name _;
 
-        # Use auth_basic for direct browser access, but allow bypassing with auth headers
-        set $auth_basic "Protected";
-
-        # If Authorization header is present, skip basic auth
-        if ($http_authorization ~ ^Bearer) {
-            set $auth_basic off;
-        }
-        if ($http_x_auth_token) {
-            set $auth_basic off;
-        }
-
-        # Skip auth for OPTIONS requests (CORS preflight)
-        if ($request_method = 'OPTIONS') {
-            set $auth_basic off;
-        }
-
-        auth_basic $auth_basic;
+        # Basic auth protection
+        auth_basic "Protected";
         auth_basic_user_file /etc/nginx/.htpasswd;
 
-        # Add common CORS headers for all requests
+        # CORS headers for all responses
         add_header 'Access-Control-Allow-Origin' '*' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range,Authorization,X-Auth-Token' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Auth-Token' always;
 
-        # Specific handler for OPTIONS requests
-        location ~ ^/(prometheus|loki|tempo)/ {
-            if ($cors_preflight = 1) {
-                add_header 'Access-Control-Allow-Origin' '*';
-                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
-                add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range,Authorization,X-Auth-Token';
-                add_header 'Access-Control-Allow-Credentials' 'true';
-                add_header 'Access-Control-Max-Age' 1728000;
-                add_header 'Content-Type' 'text/plain charset=UTF-8';
-                add_header 'Content-Length' 0;
-                return 204;
-            }
+        # Handle OPTIONS preflight requests
+        if ($request_method = OPTIONS) {
+            return 204;
         }
 
         # Add this location block for the homepage
@@ -116,76 +92,48 @@ http {
         }
 
         location /prometheus/ {
-            # Remove trailing slash and don't use path manipulation
-            proxy_pass ${PROMETHEUS_INTERNAL_URL};
+            # Strip /prometheus/ prefix when forwarding to backend
+            proxy_pass ${PROMETHEUS_INTERNAL_URL}/;
 
-            # Forward all authentication headers
+            # Standard headers
             proxy_set_header Authorization $http_authorization;
-            proxy_set_header X-Auth-Token $http_x_auth_token;
-            proxy_set_header Cookie $http_cookie;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
 
-            # Standard forwarding headers
-            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
-            proxy_set_header X-Forwarded-Proto "$scheme";
-
-            # Prometheus specific settings
-            proxy_set_header Accept-Encoding "";
-            proxy_http_version 1.1;
+            # Longer timeouts
             proxy_connect_timeout 300s;
             proxy_send_timeout 300s;
             proxy_read_timeout 300s;
-            sub_filter_types application/javascript application/json text/css text/javascript text/plain;
-            sub_filter 'var PATH_PREFIX = "";' 'var PATH_PREFIX = "/prometheus";';
-            sub_filter_once off;
         }
 
         location /loki/ {
-            # Remove trailing slash and use sub_filter for paths
-            proxy_pass ${LOKI_INTERNAL_URL};
+            # Strip /loki/ prefix when forwarding to backend
+            proxy_pass ${LOKI_INTERNAL_URL}/;
 
-            # Forward all authentication headers
+            # Standard headers
             proxy_set_header Authorization $http_authorization;
-            proxy_set_header X-Auth-Token $http_x_auth_token;
-            proxy_set_header Cookie $http_cookie;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
 
-            # Standard forwarding headers
-            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
-            proxy_set_header X-Forwarded-Proto "$scheme";
-
-            # Loki specific settings
-            proxy_http_version 1.1;
+            # Longer timeouts
             proxy_connect_timeout 300s;
             proxy_send_timeout 300s;
             proxy_read_timeout 300s;
-            sub_filter_types application/javascript application/json text/css text/javascript text/plain;
-            sub_filter 'href="/' 'href="/loki/';
-            sub_filter 'src="/' 'src="/loki/';
-            sub_filter 'endpoint":"/' 'endpoint":"/loki/';
-            sub_filter_once off;
-
-            # Max for Loki requests
-            client_max_body_size 10M;
         }
 
         location /tempo/ {
+            # Strip /tempo/ prefix when forwarding to backend
             proxy_pass ${TEMPO_INTERNAL_URL}/;
 
-            # Forward all authentication headers
+            # Standard headers
             proxy_set_header Authorization $http_authorization;
-            proxy_set_header X-Auth-Token $http_x_auth_token;
-            proxy_set_header Cookie $http_cookie;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
 
-            # Standard forwarding headers
-            proxy_set_header X-Real-IP "$remote_addr";
-            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
-            proxy_set_header X-Forwarded-Proto "$scheme";
-
-            # Add timeout settings
+            # Medium timeouts (Tempo usually responds faster)
             proxy_connect_timeout 120s;
             proxy_send_timeout 120s;
             proxy_read_timeout 120s;
-            proxy_http_version 1.1;
         }
-
     }
 }
