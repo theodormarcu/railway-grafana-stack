@@ -17,10 +17,10 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
-    # Add CORS headers
-    map $request_method $cors_method {
-        OPTIONS 'true';
-        default '';
+    # Properly format map directive for handling CORS preflight
+    map $request_method $cors_preflight {
+        OPTIONS 1;
+        default 0;
     }
 
     server {
@@ -53,7 +53,7 @@ http {
 
         # Specific handler for OPTIONS requests
         location ~ ^/(prometheus|loki|tempo)/ {
-            if ($request_method = 'OPTIONS') {
+            if ($cors_preflight = 1) {
                 add_header 'Access-Control-Allow-Origin' '*';
                 add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
                 add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range,Authorization,X-Auth-Token';
