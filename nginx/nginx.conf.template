@@ -2,137 +2,40 @@ worker_processes 1;
 
 events {
     worker_connections 512;
-    use epoll;
-    multi_accept off;
 }
 
 http {
-    keepalive_timeout 65;
-    keepalive_requests 100;
-    client_body_timeout 10;
-    client_header_timeout 10;
-    send_timeout 10;
-
-    # Add these for serving HTML content
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
-    # Properly format map directive for handling CORS preflight
-    map $request_method $cors_preflight {
-        OPTIONS 1;
-        default 0;
-    }
-
     server {
         listen 80;
-        server_name _;
 
-        # Basic auth protection
+        # Basic auth
         auth_basic "Protected";
         auth_basic_user_file /etc/nginx/.htpasswd;
 
-        # CORS headers for all responses
-        add_header 'Access-Control-Allow-Origin' '*' always;
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Auth-Token' always;
-
-        # Handle OPTIONS preflight requests
-        if ($request_method = OPTIONS) {
-            return 204;
-        }
-
-        # Add this location block for the homepage
+        # Homepage
         location = / {
             auth_basic "Protected";
             auth_basic_user_file /etc/nginx/.htpasswd;
             default_type text/html;
-            return 200 '<!DOCTYPE html>
-<html>
-<head>
-    <title>Monitoring Services</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        h1 {
-            color: #333;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
-        }
-        ul {
-            padding-left: 20px;
-        }
-        li {
-            margin-bottom: 10px;
-        }
-        a {
-            color: #0066cc;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <h1>Monitoring Services</h1>
-    <p>Welcome to the monitoring services portal. Please use the links below to access the respective services:</p>
-    <ul>
-        <li><a href="/prometheus/">Prometheus</a> - Metrics and monitoring</li>
-        <li><a href="/loki/">Loki</a> - Log aggregation</li>
-        <li><a href="/tempo/">Tempo</a> - Distributed tracing</li>
-    </ul>
-</body>
-</html>';
+            return 200 '<html><body><h1>Monitoring</h1><ul><li><a href="/prometheus/">Prometheus</a></li><li><a href="/loki/">Loki</a></li><li><a href="/tempo/">Tempo</a></li></ul></body></html>';
         }
 
+        # Simple proxies
         location /prometheus/ {
-            # Strip /prometheus/ prefix when forwarding to backend
             proxy_pass ${PROMETHEUS_INTERNAL_URL}/;
-
-            # Standard headers
-            proxy_set_header Authorization $http_authorization;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Longer timeouts
-            proxy_connect_timeout 300s;
-            proxy_send_timeout 300s;
             proxy_read_timeout 300s;
         }
 
         location /loki/ {
-            # Strip /loki/ prefix when forwarding to backend
             proxy_pass ${LOKI_INTERNAL_URL}/;
-
-            # Standard headers
-            proxy_set_header Authorization $http_authorization;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Longer timeouts
-            proxy_connect_timeout 300s;
-            proxy_send_timeout 300s;
             proxy_read_timeout 300s;
         }
 
         location /tempo/ {
-            # Strip /tempo/ prefix when forwarding to backend
             proxy_pass ${TEMPO_INTERNAL_URL}/;
-
-            # Standard headers
-            proxy_set_header Authorization $http_authorization;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Medium timeouts (Tempo usually responds faster)
-            proxy_connect_timeout 120s;
-            proxy_send_timeout 120s;
             proxy_read_timeout 120s;
         }
     }
