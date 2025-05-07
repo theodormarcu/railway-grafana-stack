@@ -17,12 +17,53 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
+    # Add CORS headers
+    map $request_method $cors_method {
+        OPTIONS 'true';
+        default '';
+    }
+
     server {
         listen 80;
         server_name _;
 
-        auth_basic "Protected";
+        # Use auth_basic for direct browser access, but allow bypassing with auth headers
+        set $auth_basic "Protected";
+
+        # If Authorization header is present, skip basic auth
+        if ($http_authorization ~ ^Bearer) {
+            set $auth_basic off;
+        }
+        if ($http_x_auth_token) {
+            set $auth_basic off;
+        }
+
+        # Skip auth for OPTIONS requests (CORS preflight)
+        if ($request_method = 'OPTIONS') {
+            set $auth_basic off;
+        }
+
+        auth_basic $auth_basic;
         auth_basic_user_file /etc/nginx/.htpasswd;
+
+        # Add common CORS headers for all requests
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range,Authorization,X-Auth-Token' always;
+
+        # Specific handler for OPTIONS requests
+        location ~ ^/(prometheus|loki|tempo)/ {
+            if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+                add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range,Authorization,X-Auth-Token';
+                add_header 'Access-Control-Allow-Credentials' 'true';
+                add_header 'Access-Control-Max-Age' 1728000;
+                add_header 'Content-Type' 'text/plain charset=UTF-8';
+                add_header 'Content-Length' 0;
+                return 204;
+            }
+        }
 
         # Add this location block for the homepage
         location = / {
@@ -75,48 +116,66 @@ http {
         }
 
         location /prometheus/ {
-            proxy_pass ${PROMETHEUS_INTERNAL_URL}/;
+            # Remove trailing slash and don't use path manipulation
+            proxy_pass ${PROMETHEUS_INTERNAL_URL};
 
-            proxy_set_header X-Real-IP "$remote_addr";
+            # Forward all authentication headers
+            proxy_set_header Authorization $http_authorization;
+            proxy_set_header X-Auth-Token $http_x_auth_token;
+            proxy_set_header Cookie $http_cookie;
+
+            # Standard forwarding headers
             proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
             proxy_set_header X-Forwarded-Proto "$scheme";
 
-            client_max_body_size 10M;
-            proxy_request_buffering off;
+            # Prometheus specific settings
+            proxy_set_header Accept-Encoding "";
             proxy_http_version 1.1;
-            proxy_connect_timeout 120s;
-            proxy_send_timeout 120s;
-            proxy_read_timeout 120s;
-        }
-
-        location /loki/ {
-            # Try using a trailing slash on the proxy_pass URL
-            proxy_pass ${LOKI_INTERNAL_URL}/;
-
-            proxy_set_header X-Real-IP "$remote_addr";
-            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
-            proxy_set_header X-Forwarded-Proto "$scheme";
-
-            # Increase timeouts to match Loki settings
             proxy_connect_timeout 300s;
             proxy_send_timeout 300s;
             proxy_read_timeout 300s;
-            proxy_buffering off;
-            proxy_request_buffering off;
+            sub_filter_types application/javascript application/json text/css text/javascript text/plain;
+            sub_filter 'var PATH_PREFIX = "";' 'var PATH_PREFIX = "/prometheus";';
+            sub_filter_once off;
+        }
 
-            # Add buffer size settings
-            client_max_body_size 10M;
-            proxy_buffer_size 128k;
-            proxy_buffers 4 256k;
-            proxy_busy_buffers_size 256k;
+        location /loki/ {
+            # Remove trailing slash and use sub_filter for paths
+            proxy_pass ${LOKI_INTERNAL_URL};
 
-            # Make sure we're using HTTP/1.1
+            # Forward all authentication headers
+            proxy_set_header Authorization $http_authorization;
+            proxy_set_header X-Auth-Token $http_x_auth_token;
+            proxy_set_header Cookie $http_cookie;
+
+            # Standard forwarding headers
+            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
+            proxy_set_header X-Forwarded-Proto "$scheme";
+
+            # Loki specific settings
             proxy_http_version 1.1;
+            proxy_connect_timeout 300s;
+            proxy_send_timeout 300s;
+            proxy_read_timeout 300s;
+            sub_filter_types application/javascript application/json text/css text/javascript text/plain;
+            sub_filter 'href="/' 'href="/loki/';
+            sub_filter 'src="/' 'src="/loki/';
+            sub_filter 'endpoint":"/' 'endpoint":"/loki/';
+            sub_filter_once off;
+
+            # Max for Loki requests
+            client_max_body_size 10M;
         }
 
         location /tempo/ {
             proxy_pass ${TEMPO_INTERNAL_URL}/;
 
+            # Forward all authentication headers
+            proxy_set_header Authorization $http_authorization;
+            proxy_set_header X-Auth-Token $http_x_auth_token;
+            proxy_set_header Cookie $http_cookie;
+
+            # Standard forwarding headers
             proxy_set_header X-Real-IP "$remote_addr";
             proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
             proxy_set_header X-Forwarded-Proto "$scheme";
