@@ -75,22 +75,26 @@ http {
         }
 
         location /prometheus/ {
-            proxy_pass ${PROMETHEUS_INTERNAL_URL};
-            rewrite ^/prometheus/?(.*)$ /$1 break;
+            proxy_pass ${PROMETHEUS_INTERNAL_URL}/;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP "$remote_addr";
+            proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
+            proxy_set_header X-Forwarded-Proto "$scheme";
 
             client_max_body_size 10M;
             proxy_request_buffering off;
             proxy_http_version 1.1;
-            proxy_connect_timeout 120;
-            proxy_send_timeout 120;
-            proxy_read_timeout 120;
+            proxy_connect_timeout 120s;
+            proxy_send_timeout 120s;
+            proxy_read_timeout 120s;
         }
 
         location /loki/ {
             # Try using a trailing slash on the proxy_pass URL
             proxy_pass ${LOKI_INTERNAL_URL}/;
 
-            proxy_set_header Host $http_host;
+            proxy_set_header Host $host;
             proxy_set_header X-Real-IP "$remote_addr";
             proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
             proxy_set_header X-Forwarded-Proto "$scheme";
@@ -113,17 +117,18 @@ http {
         }
 
         location /tempo/ {
-            proxy_pass ${TEMPO_INTERNAL_URL};
-            rewrite ^/tempo/?(.*)$ /$1 break;
-            proxy_set_header Host "$host";
+            proxy_pass ${TEMPO_INTERNAL_URL}/;
+
+            proxy_set_header Host $host;
             proxy_set_header X-Real-IP "$remote_addr";
             proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
             proxy_set_header X-Forwarded-Proto "$scheme";
 
-            # Add timeout settings (Tempo works already, but for consistency)
+            # Add timeout settings
             proxy_connect_timeout 120s;
             proxy_send_timeout 120s;
             proxy_read_timeout 120s;
+            proxy_http_version 1.1;
         }
 
     }
