@@ -12,7 +12,7 @@ http {
     client_body_timeout 10;
     client_header_timeout 10;
     send_timeout 10;
-    
+
     # Add these for serving HTML content
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
@@ -23,7 +23,7 @@ http {
 
         auth_basic "Protected";
         auth_basic_user_file /etc/nginx/.htpasswd;
-        
+
         # Add this location block for the homepage
         location = / {
             auth_basic "Protected";
@@ -87,17 +87,29 @@ http {
         }
 
         location /loki/ {
-            proxy_pass ${LOKI_INTERNAL_URL};
-            rewrite ^/loki/?(.*)$ /$1 break;
-            proxy_set_header Host "$host";
+            # Try using a trailing slash on the proxy_pass URL
+            proxy_pass ${LOKI_INTERNAL_URL}/;
+
+            proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP "$remote_addr";
             proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
             proxy_set_header X-Forwarded-Proto "$scheme";
 
-            # Add these timeout settings
-            proxy_connect_timeout 120;
-            proxy_send_timeout 120;
-            proxy_read_timeout 120;
+            # Increase timeouts to match Loki settings
+            proxy_connect_timeout 300s;
+            proxy_send_timeout 300s;
+            proxy_read_timeout 300s;
+            proxy_buffering off;
+            proxy_request_buffering off;
+
+            # Add buffer size settings
+            client_max_body_size 10M;
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+
+            # Make sure we're using HTTP/1.1
+            proxy_http_version 1.1;
         }
 
         location /tempo/ {
@@ -107,6 +119,11 @@ http {
             proxy_set_header X-Real-IP "$remote_addr";
             proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for";
             proxy_set_header X-Forwarded-Proto "$scheme";
+
+            # Add timeout settings (Tempo works already, but for consistency)
+            proxy_connect_timeout 120s;
+            proxy_send_timeout 120s;
+            proxy_read_timeout 120s;
         }
 
     }
