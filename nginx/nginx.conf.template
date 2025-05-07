@@ -25,12 +25,12 @@ http {
 
         # Simple proxies
         location /prometheus/ {
-            proxy_pass ${PROMETHEUS_INTERNAL_URL}/;
+            proxy_pass http://prometheus:9090/;
             proxy_read_timeout 300s;
         }
 
         location /loki/ {
-            proxy_pass ${LOKI_INTERNAL_URL}/;
+            proxy_pass http://loki:3100/;
             proxy_read_timeout 300s;
         }
 
