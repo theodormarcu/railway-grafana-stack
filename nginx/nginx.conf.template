@@ -8,6 +8,13 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
+    proxy_connect_timeout 600s;
+    proxy_send_timeout 600s;
+    proxy_read_timeout 600s;
+    send_timeout 600s;
+    client_body_timeout 600s;
+    keepalive_timeout 600s;
+
     server {
         listen 80;
 
@@ -31,16 +38,38 @@ http {
             proxy_read_timeout 300s;
         }
 
-        location /loki {
-            rewrite /loki/(.*) /$1 break;
-            proxy_pass ${LOKI_INTERNAL_URL};
-            proxy_http_version 1.1;
-            proxy_read_timeout 300s;
-        }
 
         location /tempo/ {
             proxy_pass ${TEMPO_INTERNAL_URL}/;
             proxy_read_timeout 120s;
+        }
+
+        location /loki/api/v1/push {
+            proxy_pass ${LOKI_INTERNAL_URL}/loki/api/v1/push;
+            proxy_http_version 1.1;
+            proxy_read_timeout 300s;
+        }
+
+        location /loki/api/v1/labels {
+            proxy_pass ${LOKI_INTERNAL_URL}/loki/api/v1/labels;
+            proxy_http_version 1.1;
+            proxy_read_timeout 300s;
+        }
+
+        location /loki/api/v1/query_range {
+            proxy_pass ${LOKI_INTERNAL_URL}/loki/api/v1/query_range;
+            proxy_http_version 1.1;
+            proxy_read_timeout 600s;
+        }
+
+        location /loki/ {
+            proxy_pass ${LOKI_INTERNAL_URL}/;
+            proxy_http_version 1.1;
+            proxy_read_timeout 600s;
+            proxy_buffering off;  # Turn off buffering for streaming responses
+            proxy_set_header Connection "keep-alive";
+            add_header X-Debug-Original-URI $request_uri;
+            add_header X-Debug-Proxy-Path $uri;
         }
     }
 }
