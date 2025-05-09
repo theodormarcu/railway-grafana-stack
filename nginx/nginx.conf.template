@@ -68,8 +68,6 @@ http {
             proxy_read_timeout 600s;
             proxy_buffering off;  # Turn off buffering for streaming responses
             proxy_set_header Connection "keep-alive";
-            add_header X-Debug-Original-URI $request_uri;
-            add_header X-Debug-Proxy-Path $uri;
         }
     }
 }
