@@ -10,6 +10,6 @@ else
 fi
 
 # Substitute env vars in nginx.conf.template -> nginx.conf
-envsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+envsubst '${PROMETHEUS_INTERNAL_URL} ${LOKI_INTERNAL_URL} ${TEMPO_INTERNAL_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
 
 exec "$@"
